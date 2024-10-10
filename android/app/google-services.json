@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "262580943540",
+    "project_id": "offline-attendence",
+    "storage_bucket": "offline-attendence.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:262580943540:android:b0f021f0588e6801cdf5e1",
+        "android_client_info": {
+          "package_name": "com.example.offline_attendence"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJO_Y7zPjvBkge2krxHVO_yXiogHSweHc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

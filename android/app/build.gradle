@@ -1,0 +1,66 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // FlutterFire Configuration for Firebase
+    id 'com.google.gms.google-services'
+    // The Flutter Gradle Plugin
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace = "com.example.offline_attendence"
+    compileSdkVersion 34  // Specify the latest stable compile SDK version
+    ndkVersion "23.1.7779620"  // Optional, only if you're using native code, adjust as necessary
+
+    defaultConfig {
+        applicationId "com.example.offline_attendence"
+        minSdkVersion 23  // Minimum supported SDK version for your project
+        targetSdkVersion 33  // Latest stable target SDK version
+        versionCode 1  // Update as needed
+        versionName "1.0"  // Update as needed
+
+        // Java compatibility settings
+        compileOptions {
+            sourceCompatibility = JavaVersion.VERSION_1_8
+            targetCompatibility = JavaVersion.VERSION_1_8
+        }
+
+        // Kotlin compatibility settings
+        kotlinOptions {
+            jvmTarget = "1.8"
+        }
+
+        // Enable multiDex if your app exceeds the 64K method limit
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            // Use debug signing for testing, use a real keystore for production builds
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+flutter {
+    source = "../.."  // Points to the root directory of your Flutter project
+}
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:32.1.1')  // Latest Firebase BOM
+
+    // Firebase Authentication
+    implementation 'com.google.firebase:firebase-auth'
+
+    // Google Play Services for Google Sign-In
+    implementation 'com.google.android.gms:play-services-auth:20.7.0'  // Latest stable version
+
+    // MultiDex support
+    implementation 'androidx.multidex:multidex:2.0.1'
+}
+
+// Apply the Google Services plugin for Firebase configuration
+apply plugin: 'com.google.gms.google-services'
