@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart'; // For date formatting
 
 class MathPage extends StatefulWidget {
   const MathPage({super.key});
@@ -16,6 +17,7 @@ class _MathPageState extends State<MathPage> {
   String searchQuery = "";
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool isDownloading = false; // To track download status
+  DateTime today = DateTime.now(); // For keeping track of today's date
 
   @override
   void initState() {
@@ -24,14 +26,26 @@ class _MathPageState extends State<MathPage> {
   }
 
   Future<void> fetchStudents() async {
-    QuerySnapshot querySnapshot = await _firestore.collection('students').get();
+    String formattedDate = DateFormat('yyyy-MM-dd').format(today);
+
+    QuerySnapshot querySnapshot = await _firestore
+        .collection('math_students')
+        .doc(formattedDate) // Get the collection for today
+        .collection('students')
+        .get();
+
+    if (querySnapshot.docs.isEmpty) {
+      // No attendance found for today, set all to 'Absent'
+      await _firestore.collection('math_students').doc(formattedDate).set({});
+    }
+
     setState(() {
       students.clear();
       for (var doc in querySnapshot.docs) {
         students.add({
           'name': doc['name'],
           'auid': doc['auid'],
-          'status': 'Absent', // Default status
+          'status': doc['status'] ?? 'Absent', // Default status
           'id': doc.id, // Store Firestore document ID for deletion
         });
       }
@@ -39,12 +53,19 @@ class _MathPageState extends State<MathPage> {
   }
 
   void addStudent(String name, String auid) {
-    _firestore.collection('students').add({'name': name, 'auid': auid}).then((_) {
+    String formattedDate = DateFormat('yyyy-MM-dd').format(today);
+    _firestore
+        .collection('math_students')
+        .doc(formattedDate)
+        .collection('students')
+        .add({'name': name, 'auid': auid, 'status': 'Absent'}).then((_) {
       fetchStudents();
     });
   }
 
   void markAttendance(int index, String status) {
+    String formattedDate = DateFormat('yyyy-MM-dd').format(today);
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -57,6 +78,12 @@ class _MathPageState extends State<MathPage> {
                 setState(() {
                   students[index]['status'] = status; // Update the status
                 });
+                _firestore
+                    .collection('math_students')
+                    .doc(formattedDate)
+                    .collection('students')
+                    .doc(students[index]['id'])
+                    .update({'status': status}); // Update Firestore
                 Navigator.of(context).pop();
               },
               child: const Text('Yes'),
@@ -72,7 +99,15 @@ class _MathPageState extends State<MathPage> {
   }
 
   Future<void> deleteStudent(String id, int index) async {
-    await _firestore.collection('students').doc(id).delete(); // Delete from Firestore
+    String formattedDate = DateFormat('yyyy-MM-dd').format(today);
+
+    await _firestore
+        .collection('math_students')
+        .doc(formattedDate)
+        .collection('students')
+        .doc(id)
+        .delete(); // Delete from Firestore
+
     setState(() {
       students.removeAt(index); // Remove from local list
     });
@@ -81,32 +116,16 @@ class _MathPageState extends State<MathPage> {
     );
   }
 
-  void showDeleteConfirmationDialog(String id, int index) {
+  Future<void> downloadCSV() async {
+    // Show loading dialog
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Student'),
-          content: const Text('Are you sure you want to delete this student?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                deleteStudent(id, index);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Yes'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('No'),
-            ),
-          ],
-        );
+      barrierDismissible: false,
+      builder: (context) {
+        return const Center(child: CircularProgressIndicator());
       },
     );
-  }
 
-  Future<void> downloadCSV() async {
     setState(() {
       isDownloading = true; // Start downloading
     });
@@ -121,13 +140,16 @@ class _MathPageState extends State<MathPage> {
 
     String csv = const ListToCsvConverter().convert(csvData);
     final directory = await getApplicationDocumentsDirectory();
-    final path = '${directory.path}/attendance_${DateTime.now().toIso8601String()}.csv';
+    final path =
+        '${directory.path}/math_attendance_${DateFormat('yyyyMMdd').format(today)}.csv';
     File file = File(path);
     await file.writeAsString(csv);
 
     setState(() {
       isDownloading = false; // Download complete
     });
+
+    Navigator.of(context).pop(); // Close loading dialog
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("CSV downloaded to $path")),
@@ -177,12 +199,19 @@ class _MathPageState extends State<MathPage> {
   @override
   Widget build(BuildContext context) {
     final filteredStudents = students
-        .where((student) => student['name'].toLowerCase().contains(searchQuery.toLowerCase()))
+        .where((student) =>
+            student['name'].toLowerCase().contains(searchQuery.toLowerCase()))
         .toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Student List"),
+        title: const Text("Math Student List"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: isDownloading ? null : downloadCSV, // Download CSV
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(50.0),
           child: Padding(
@@ -209,14 +238,16 @@ class _MathPageState extends State<MathPage> {
               itemBuilder: (context, index) {
                 return GestureDetector(
                   onLongPress: () {
-                    showDeleteConfirmationDialog(filteredStudents[index]['id'], students.indexOf(filteredStudents[index]));
+                    deleteStudent(filteredStudents[index]['id'],
+                        students.indexOf(filteredStudents[index]));
                   },
                   child: Card(
                     margin: const EdgeInsets.all(8.0),
                     child: ListTile(
                       leading: const Icon(Icons.person),
                       title: Text('${filteredStudents[index]['name']}'),
-                      subtitle: Text('AUID: ${filteredStudents[index]['auid']}\nStatus: ${filteredStudents[index]['status']}'),
+                      subtitle: Text(
+                          'AUID: ${filteredStudents[index]['auid']}\nStatus: ${filteredStudents[index]['status']}'),
                       isThreeLine: true,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -224,13 +255,17 @@ class _MathPageState extends State<MathPage> {
                           IconButton(
                             icon: const Icon(Icons.check, color: Colors.green),
                             onPressed: () {
-                              markAttendance(students.indexOf(filteredStudents[index]), 'Present');
+                              markAttendance(
+                                  students.indexOf(filteredStudents[index]),
+                                  'Present');
                             },
                           ),
                           IconButton(
                             icon: const Icon(Icons.close, color: Colors.red),
                             onPressed: () {
-                              markAttendance(students.indexOf(filteredStudents[index]), 'Absent');
+                              markAttendance(
+                                  students.indexOf(filteredStudents[index]),
+                                  'Absent');
                             },
                           ),
                         ],
@@ -251,12 +286,6 @@ class _MathPageState extends State<MathPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: showAddStudentDialog,
         child: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        child: IconButton(
-          icon: const Icon(Icons.download),
-          onPressed: isDownloading ? null : downloadCSV, // Disable if downloading
-        ),
       ),
     );
   }

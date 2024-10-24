@@ -9,7 +9,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 class ProfileScreen extends StatefulWidget {
   final User? user;
 
-  const ProfileScreen({super.key, required this.user});
+  const ProfileScreen({Key? key, required this.user}) : super(key: key);
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -34,7 +34,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _fetchUserData() async {
     if (widget.user != null) {
       try {
-        DocumentSnapshot userDoc = await _firestore.collection('users').doc(widget.user!.uid).get();
+        DocumentReference userDocRef = _firestore.collection('users').doc(widget.user!.uid);
+        DocumentSnapshot userDoc = await userDocRef.get();
 
         if (userDoc.exists) {
           setState(() {
@@ -42,8 +43,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             profilePictureUrl = userDoc['profilePicture'] ?? widget.user!.photoURL;
           });
         } else {
+          // Create the user document if it does not exist
+          await userDocRef.set({
+            'username': 'Default Username', // Set a default username
+            'profilePicture': widget.user!.photoURL, // Use the user's photo URL as the default profile picture
+          });
           setState(() {
-            username = 'No username set';
+            username = 'Default Username';
             profilePictureUrl = widget.user!.photoURL;
           });
         }
@@ -59,16 +65,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final newUsername = await _showUsernameDialog(username);
     if (newUsername != null && newUsername.isNotEmpty) {
       try {
-        print('Updating username for UID: ${widget.user!.uid}');
         await _firestore.collection('users').doc(widget.user!.uid).update({'username': newUsername});
         setState(() {
-          username = newUsername; // Update the state with the new username
+          username = newUsername;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Username updated successfully")),
         );
       } catch (e) {
-        print('Failed to update username: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Failed to update username: $e")),
         );
@@ -88,7 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         String newProfilePicUrl = await _uploadImageToFirebase(_profileImage!);
         await _firestore.collection('users').doc(widget.user!.uid).update({'profilePicture': newProfilePicUrl});
         setState(() {
-          profilePictureUrl = newProfilePicUrl;
+          profilePictureUrl = newProfilePicUrl; // Update the profile picture URL
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -130,7 +134,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(controller.text.trim()); // Trim the input
+                Navigator.of(context).pop(controller.text.trim());
               },
               child: const Text("Save"),
             ),
@@ -153,7 +157,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text("Profile"),
         centerTitle: true,
         elevation: 4,
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.blue,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -166,9 +170,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: _changeProfilePicture,
                   child: CircleAvatar(
                     radius: 70,
-                    backgroundImage: profilePictureUrl != null
-                        ? NetworkImage(profilePictureUrl!)
-                        : const AssetImage('assets/images/default_profile.png') as ImageProvider,
+                    backgroundImage: _profileImage != null
+                        ? FileImage(_profileImage!)
+                        : profilePictureUrl != null
+                            ? NetworkImage(profilePictureUrl!)
+                            : const AssetImage('assets/images/default_profile.png') as ImageProvider,
                     child: Container(
                       decoration: const BoxDecoration(
                         color: Colors.black54,
@@ -184,41 +190,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
                 const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.edit),
-                  label: const Text("Change Username"),
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white, backgroundColor: Colors.deepPurple, // Text color
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  ),
-                  onPressed: _updateProfile,
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.logout),
-                  label: const Text("Logout"),
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white, backgroundColor: Colors.red, // Text color
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  ),
-                  onPressed: _logOut,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.edit),
+                        label: const Text("Change Name"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white10,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        onPressed: _updateProfile,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.logout),
+                        label: const Text("Logout"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white10,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        onPressed: _logOut,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 30),
                 const Divider(color: Colors.grey),
                 const SizedBox(height: 20),
-                const Text(
-                  "User Details",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black54),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "User ID: ${widget.user?.uid}",
-                  style: const TextStyle(fontSize: 16, color: Colors.black54),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  "Email: ${widget.user?.email}",
-                  style: const TextStyle(fontSize: 16, color: Colors.black54),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "User Details",
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black54),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "User ID: ${widget.user?.uid}",
+                          style: const TextStyle(fontSize: 16, color: Colors.black54),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          "Email: ${widget.user?.email}",
+                          style: const TextStyle(fontSize: 16, color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),

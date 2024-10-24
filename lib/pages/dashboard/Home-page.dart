@@ -5,8 +5,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:offline_attendence/pages/dashboard/bca/Defult.dart';
 import 'package:offline_attendence/pages/dashboard/bca/eng.dart';
 import 'package:offline_attendence/pages/dashboard/bca/math.dart';
-import 'package:offline_attendence/pages/profile/profile_page.dart';
+import 'package:offline_attendence/pages/profile/notification.dart';
 import 'package:offline_attendence/pages/log_in/login-page.dart'; // Lucide Icons for modern look
+import 'package:offline_attendence/pages/profile/profile_page.dart';
 import 'bca/bca.dart';
 
 void main() {
@@ -56,7 +57,7 @@ class _HomepageState extends State<Homepage> {
     HomeScreen(
       user: null,
     ),
-    ProfileScreen(user: null,),
+    NotificationPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -193,17 +194,32 @@ void _showSnackbar(BuildContext context, String message, Color color) {
                   _selectedIndex = 0;
                 });
               },
+              
             ),
             ListTile(
-              leading: const Icon(LucideIcons.user),
+              leading: const Icon(LucideIcons.bell),
+              title: const Text('Notification'),
+              onTap: () {
+                Navigator.pop(context); // Close the drawer if it's open
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NotificationPage(
+                        ), // Pass the current user
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.user2),
               title: const Text('Profile'),
               onTap: () {
                 Navigator.pop(context); // Close the drawer if it's open
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ProfileScreen(
-                        user: _currentUser), // Pass the current user
+                    builder: (context) => ProfileScreen(user: _currentUser
+                        ), // Pass the current user
                   ),
                 );
               },
@@ -213,7 +229,7 @@ void _showSnackbar(BuildContext context, String message, Color color) {
       ),
       body: _selectedIndex == 0
           ? HomeScreen(user: _currentUser)
-          : const ProfileScreen(user: null,),
+          : const NotificationPage(),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -221,8 +237,8 @@ void _showSnackbar(BuildContext context, String message, Color color) {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(LucideIcons.user),
-            label: 'Profile',
+            icon: Icon(LucideIcons.bell),
+            label: 'Notifications',
           ),
         ],
         currentIndex: _selectedIndex,
@@ -428,7 +444,7 @@ class AnimatedListItem extends StatelessWidget {
                 return MathPage();
               // Add more classes as needed
               default:
-                return DefaultPage(); // Fallback if no match
+                return DefaultPage(departmentName: '',); // Fallback if no match
             }
           },
         ),
